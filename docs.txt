@@ -1,0 +1,3 @@
+currentboard = current bioard
+project - title resolution boards background
+canvupdate update canvas
