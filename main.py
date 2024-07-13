@@ -1,8 +1,16 @@
 from tkinter import *
 import math
-from tkinter import messagebox
+import time
 
 # Define important variables
+
+# Flags for small functions
+animisplaying = False
+bbarGrabbed = False
+bbarGrabID = 0
+bbarStartLength = 0
+
+
 erasersize = 2
 canvascontent = [[]]
 canvascurrentlist = 0
@@ -27,11 +35,12 @@ class Project:
         self.background = background
 # Class for a frame
 class Board:
-    def __init__(self, get):
+    def __init__(self, get, length):
         self.get = get
+        self.length = length
 
 currentboard = 0
-project = Project("New Project", (640, 360), [Board([[]]), Board([[]]), Board([[]])], "none")
+project = Project("New Project", (640, 360), [Board([[]], 1000)], "none")
 
 
 def centerWindow():
@@ -57,6 +66,8 @@ imgpen = PhotoImage(file="./icons/pen.png").subsample(4,4)
 imgera = PhotoImage(file="./icons/eraser.png").subsample(4,4)
 imgadd = PhotoImage(file="./icons/add.png").subsample(4,4)
 imgdel = PhotoImage(file="./icons/delete.png").subsample(4,4)
+imgply = PhotoImage(file="./icons/play.png").subsample(4,4)
+imgstp = PhotoImage(file="./icons/stop.png").subsample(4,4)
 
 # Set up menus
 menubar = Menu(root, background='black', foreground='white', activebackground='black', activeforeground='white')
@@ -70,7 +81,7 @@ menubar.add_cascade(label="File", menu=file)
 # Events activated by buttons that cannot be placed below
 
 def newBoard():
-    project.boards.insert(currentboard + 1, Board([[]]))
+    project.boards.insert(currentboard + 1, Board([[]], 1000))
     bbarUpdate()
 
 def delBoard():
@@ -79,6 +90,34 @@ def delBoard():
     if(currentboard > len(project.boards) - 1):
         currentboard = len(project.boards) - 1
     bbarUpdate()
+
+def stopBack():
+    global animisplaying
+    animisplaying = False
+
+def playBack():
+    global animisplaying
+    animisplaying = True
+    root.after(project.boards[currentboard].length, playLoop)
+def playLoop():
+    global animisplaying
+    if (animisplaying == True):
+        print(animisplaying)
+        global currentboard
+        currentboard = currentboard + 1
+        print(str(currentboard) + " and " + str(len(project.boards)))
+        if((currentboard < len(project.boards)) & (animisplaying == True)):
+            root.after(project.boards[currentboard].length, playLoop)
+        screenupdate(0)
+
+""" DO NOT USE sleep, WILL HAVE CONSEQUENCES!!!
+EXAMPLE CODE TO NOT RUN DO NOT USE THIS DO NOT USE sleep STOP USING sleep
+    for i in range(len(project.boards)):
+        global currentboard
+        currentboard = i
+        screenupdate(0)
+        time.sleep(1 / 12)
+"""
 
 def sizepickerupdate(a):
     global erasersize
@@ -107,6 +146,8 @@ bottombuttons = Frame(bottombar, bg=bgcolor)
 
 BTNaddBoard = Button(bottombuttons, image=imgadd, highlightthickness=0, borderwidth=0, bg=bgcolor, command=newBoard)
 BTNdelBoard = Button(bottombuttons, image=imgdel, highlightthickness=0, borderwidth=0, bg=bgcolor, command=delBoard)
+BTNplayAnim = Button(bottombuttons, image=imgply, highlightthickness=0, borderwidth=0, bg=bgcolor, command=playBack)
+BTNstopAnim = Button(bottombuttons, image=imgstp, highlightthickness=0, borderwidth=0, bg=bgcolor, command=stopBack)
 
 bottomc = Canvas(bottombar, bg=bgcolor, highlightthickness=0, height=100)
 
@@ -125,6 +166,8 @@ bottombar.grid(column=0, row=1, columnspan=2, sticky="NSEW", ipadx=0, ipady=0)
 bottombuttons.grid(sticky="", column=0, row=0, ipadx=10, ipady=2 )
 BTNaddBoard.pack()
 BTNdelBoard.pack()
+BTNplayAnim.pack()
+BTNstopAnim.pack()
 bottomc.grid(sticky="EW", column=1, row=0)
 
 #Define canvas drawing events
@@ -178,7 +221,6 @@ def resetzoom(a):
     zoom = 1
     canvupdate(1)
 def screenupdate(a):
-    print("se")
     canvupdate(0)
     bbarUpdate()
 
@@ -234,31 +276,76 @@ def zoomOut():
 def bbarUpdate():
     bottomc.delete("all")
     thumbsizedivide = 6
+    currentx = 10
     for i in range(0, len(project.boards)):
         thumbpad = 10
-        thumbx = project.resolution[0] / thumbsizedivide
-        thumby = project.resolution[1] / thumbsizedivide
+        thumbx = project.boards[i].length / thumbsizedivide
+        thumby = 20
+        if(currentboard == i):
+            bottomc.create_rectangle(currentx, thumbpad, currentx + thumbx, thumby + thumbpad, outline="blue", fill="white", width="3")
+        else:
+            bottomc.create_rectangle(currentx, thumbpad, currentx + thumbx, thumby + thumbpad, outline="", fill="white")
+        currentx = currentx + thumbx + thumbpad
+
+        """ Deprecated due to variable lengths
         if(currentboard == i):
             bottomc.create_rectangle(((thumbx + thumbpad) * i) + thumbpad, thumbpad, ((thumbx + thumbpad) * (i+1)), thumbpad + thumby, outline="blue", fill="white", width="2")
         else:
             bottomc.create_rectangle(((thumbx + thumbpad) * i) + thumbpad, thumbpad, ((thumbx + thumbpad) * (i+1)), thumbpad + thumby, outline="", fill="white")
+        """
+
+
+def bbarGrab(e):
+    global bbarGrabbed
+    if(bbarGrabbed):
+        global bbarStartLength
+        project.boards[bbarGrabID].length = int(abs(((e.x) - (bbarStartLength)) * 6))
+        bbarUpdate()
+
+def bbarRls(e):
+    global bbarGrabbed
+    bbarGrabbed = False
 
 def bbarCanvChek(e):
+    currentx = 10
     thumbsizedivide = 6
+    thumbpad = 10
+
+    for i in range(0, len(project.boards)):
+        thumbx = project.boards[i].length / thumbsizedivide
+        thumby = 20
+        if ((e.x > currentx) & (e.x < currentx + thumbx) & (e.y < thumby + thumbpad)):
+            global currentboard
+            currentboard = i
+            screenupdate(0)
+        elif ((e.x > currentx + thumbx) & (e.x < currentx + thumbx + thumbpad) & (e.y < thumby + thumbpad)):
+            print("Grab!")
+            global bbarGrabbed
+            global bbarGrabID
+            global bbarStartLength
+            bbarGrabID = i
+            bbarGrabbed = True
+            bbarStartLength = currentx
+        currentx = currentx + thumbx + thumbpad
+    """ Deprecated due to new variable-length boards to represent length
     for i in range(0, len(project.boards)):
         thumbpad = 10
-        thumbx = project.resolution[0] / thumbsizedivide
-        thumby = project.resolution[1] / thumbsizedivide
+        thumbx = project.boards[i].length / thumbsizedivide
+        thumby = 10
         if((e.x < ((thumbx + thumbpad) * (i+1))) & (e.x > ((thumbx + thumbpad) * i) + thumbpad)):
             global currentboard
             currentboard = i
             screenupdate(0)
+        elif((e.x > ((thumbx + thumbpad) * i) + thumbpad) & ((e.x < (thumbpad + (thumbx))))):
+            print("res")
 #       bottomc.create_rectangle(((thumbx + thumbpad) * i) + thumbpad, thumbpad, ((thumbx + thumbpad) * (i+1)), thumbpad + thumby, outline="", fill="white")
-
+    """
 
 canvas.bind('<MouseWheel>', zoomWinOSX)
 canvas.bind('<B1-Motion>', drawmove)
-bottomc.bind('<1>', bbarCanvChek)
+bottomc.bind('<B1-Motion>', bbarGrab)
+bottomc.bind('<ButtonRelease-1>', bbarRls)
+bottomc.bind('<Button>', bbarCanvChek)
 erasersizepicker.bind('<ButtonRelease-1>', screenupdate)
 canvas.bind('<ButtonPress-1>', drawmove)
 #bottomc.bind('<ButtonPress-1>', bbarCanvChek())
