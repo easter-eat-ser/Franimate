@@ -1,4 +1,8 @@
+import json
+import tkinter
 from tkinter import *
+from tkinter import filedialog
+from tkinter import messagebox
 import math
 
 # Define important variables
@@ -41,6 +45,9 @@ class Board:
         self.length = length
 
 
+def cerealizator(milk):
+    return milk.__dict__
+
 currentboard = 0
 project = Project("New Project", (640, 360), [Board([[]], 1000)], "none")
 
@@ -60,7 +67,7 @@ def centerWindow():
 # TODO: make customizable
 root = Tk()
 root.geometry("1280x720")
-root.title('Franimate 24.07.09 - ' + project.title)
+root.title('Franimate 24.07.13 - ' + project.title)
 centerWindow()
 
 # import images
@@ -71,15 +78,52 @@ imgadd = PhotoImage(file="./icons/add.png").subsample(4, 4)
 imgdel = PhotoImage(file="./icons/delete.png").subsample(4, 4)
 imgply = PhotoImage(file="./icons/play.png").subsample(4, 4)
 imgstp = PhotoImage(file="./icons/stop.png").subsample(4, 4)
+imglit = PhotoImage(file="./icons/light.png")
+
+
+# Menu functions
+def openProjectFile():
+    pjfilep = filedialog.askopenfilename(filetypes=[('JSON project file', '*.json')])
+    pjfile = open(pjfilep, 'r')
+    try:
+        global project
+        # pfd = pjfile dict
+        pfd = list(json.load(pjfile).values())
+        print((dict(pfd[2][0])).get("get"))
+        boardlist = []
+        for i in range(len(pfd[2])):
+            boardlist.append(Board(dict(pfd[2][i]).get("get"), dict(pfd[2][i]).get("length")))
+        print(boardlist)
+        project = Project(pfd[0], pfd[1], boardlist, pfd[3])
+    except Exception as excodename:
+        messagebox.showerror(title="File error", message=excodename)
+    else:
+        messagebox.showinfo(title="Information", message="Loaded")
+    pjfile.close()
+    screenupdate(0)
+
+def saveProjectFile():
+    pjfile = filedialog.asksaveasfile(mode='w', filetypes=[('JSON project file', '*.json')])
+    if pjfile is None:
+        messagebox.showerror(title="File error", message="No file")
+    global project
+    writefile = "Not saved"
+    try:
+        writefile = json.dumps(vars(project), default=cerealizator)
+    except TypeError as excodename:
+        messagebox.showerror(title="File error", message=excodename)
+    print(writefile)
+    pjfile.write(writefile)
+    pjfile.close()
 
 # Set up menus
 menubar = Menu(root, background='black', foreground='white', activebackground='black', activeforeground='white')
 file = Menu(menubar, tearoff=False)
-file.add_command(label="Open project file")
+file.add_command(label="Open project file", command=lambda: openProjectFile())
+file.add_command(label="Save", command=lambda: saveProjectFile())
 file.add_command(label="Quit")
 
 menubar.add_cascade(label="File", menu=file)
-
 
 # -------------------------------------------------------------------------------------#
 # Events activated by buttons that cannot be placed below
@@ -314,7 +358,7 @@ def bbarGrab(e):
     global bbarGrabbed
     if bbarGrabbed:
         global bbarStartLength
-        project.boards[bbarGrabID].length = int(abs((e.x - bbarStartLength) * 6))
+        project.boards[bbarGrabID].length = int(abs((bottomc.canvasx(e.x) - bbarStartLength) * 6))
         bbarUpdate()
 
 
@@ -327,15 +371,16 @@ def bbarCanvChek(e):
     currentx = 10
     thumbsizedivide = 6
     thumbpad = 10
+    relativecanvasmousex = bottomc.canvasx(e.x)
 
     for i in range(0, len(project.boards)):
         thumbx = project.boards[i].length / thumbsizedivide
         thumby = 20
-        if (e.x > currentx) & (e.x < currentx + thumbx) & (e.y < thumby + thumbpad):
+        if (relativecanvasmousex > currentx) & (relativecanvasmousex < currentx + thumbx) & (e.y < thumby + thumbpad):
             global currentboard
             currentboard = i
             screenupdate(0)
-        elif (e.x > currentx + thumbx) & (e.x < currentx + thumbx + thumbpad) & (e.y < thumby + thumbpad):
+        elif (relativecanvasmousex > currentx + thumbx) & (relativecanvasmousex < currentx + thumbx + thumbpad) & (e.y < thumby + thumbpad):
             print("Grab!")
             global bbarGrabbed
             global bbarGrabID
@@ -344,6 +389,11 @@ def bbarCanvChek(e):
             bbarGrabbed = True
             bbarStartLength = currentx
         currentx = currentx + thumbx + thumbpad
+    if(e.x > (bottomc.winfo_width() - 20)):
+        bottomc.xview_scroll(1, UNITS)
+    if(e.x < 20):
+        bottomc.xview_scroll(-1, UNITS)
+
 
 
 canvas.bind('<MouseWheel>', zoomWinOSX)
