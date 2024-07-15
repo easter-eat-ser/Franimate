@@ -1,5 +1,5 @@
 import json
-import tkinter
+# import wave
 from tkinter import *
 from tkinter import filedialog
 from tkinter import messagebox
@@ -13,13 +13,23 @@ bbarGrabbed = False
 bbarGrabID = 0
 bbarStartLength = 0
 
-erasersize = 2
+# Variable that stores the visualized waveform of the imported audio
+importaudiovec = [(0, 0), (0, 0)]
+importaudiofreq = 1
+
+toolchoice = "p"
+pref_firstonionskin = False
+pref_beforeonionskin = False
+pref_afteronionskin = False
+
+erasersize = 10
 canvascontent = [[]]
 canvascurrentlist = 0
-windowwidth = 1280
-windowheight = 720
+windowwidth = 1920
+windowheight = 1080
 fgcolor = "#EEE"
 bgcolor = "#111"
+linewidth = 7
 drawx = 0
 drawy = 0
 drawdown = False
@@ -31,11 +41,12 @@ zoom = 1
 
 # Class for a project
 class Project:
-    def __init__(self, title, resolution, boards, background):
+    def __init__(self, title, resolution, boards, background, audiopath):
         self.title = str(title)
         self.resolution = resolution
         self.boards = boards
         self.background = background
+        self.audiopath = audiopath
 
 
 # Class for a frame
@@ -48,11 +59,12 @@ class Board:
 def cerealizator(milk):
     return milk.__dict__
 
+
 currentboard = 0
-project = Project("New Project", (640, 360), [Board([[]], 1000)], "none")
+project = Project("New Project", (1632, 918), [Board([[]], 1000)], "none", audiopath="NA")
 
 
-def centerWindow():
+def center_window():
     # thanks xxmbabanexx from stackoverflow
     # get screen width and height
     ws = root.winfo_screenwidth()
@@ -66,9 +78,9 @@ def centerWindow():
 # Set up window defaults
 # TODO: make customizable
 root = Tk()
-root.geometry("1280x720")
-root.title('Franimate 24.07.13 - ' + project.title)
-centerWindow()
+root.geometry("1920x1080")
+root.title('Franimate 24.07.13 - ' + project.audiopath)
+#center_window()
 
 # import images
 # external image import
@@ -82,7 +94,7 @@ imglit = PhotoImage(file="./icons/light.png")
 
 
 # Menu functions
-def openProjectFile():
+def open_projectfile():
     pjfilep = filedialog.askopenfilename(filetypes=[('JSON project file', '*.json')])
     pjfile = open(pjfilep, 'r')
     try:
@@ -94,15 +106,16 @@ def openProjectFile():
         for i in range(len(pfd[2])):
             boardlist.append(Board(dict(pfd[2][i]).get("get"), dict(pfd[2][i]).get("length")))
         print(boardlist)
-        project = Project(pfd[0], pfd[1], boardlist, pfd[3])
+        project = Project(pfd[0], pfd[1], boardlist, pfd[3], pfd[4])
     except Exception as excodename:
-        messagebox.showerror(title="File error", message=excodename)
+        messagebox.showerror(title="File error", message=str(excodename))
     else:
         messagebox.showinfo(title="Information", message="Loaded")
     pjfile.close()
     screenupdate(0)
 
-def saveProjectFile():
+
+def save_projectfile():
     pjfile = filedialog.asksaveasfile(mode='w', filetypes=[('JSON project file', '*.json')])
     if pjfile is None:
         messagebox.showerror(title="File error", message="No file")
@@ -111,42 +124,70 @@ def saveProjectFile():
     try:
         writefile = json.dumps(vars(project), default=cerealizator)
     except TypeError as excodename:
-        messagebox.showerror(title="File error", message=excodename)
+        messagebox.showerror(title="File error", message=str(excodename))
     print(writefile)
     pjfile.write(writefile)
     pjfile.close()
 
+
+def set_audiopath():
+    project.audiopath = filedialog.askopenfilename(filetypes=[('Waveform audio', '*.wav')])
+    bbar_wave_load()
+    bbar_update()
+
+def preference_refresh():
+    global pref_afteronionskin
+    global pref_firstonionskin
+    global pref_beforeonionskin
+    pref_firstonionskin = mpref_firstonionskin.get()
+    pref_beforeonionskin = mpref_beforeonionskin.get()
+    pref_afteronionskin = mpref_afteronionskin.get()
+    canvupdate()
+
 # Set up menus
 menubar = Menu(root, background='black', foreground='white', activebackground='black', activeforeground='white')
 file = Menu(menubar, tearoff=False)
-file.add_command(label="Open project file", command=lambda: openProjectFile())
-file.add_command(label="Save", command=lambda: saveProjectFile())
+file.add_command(label="Open file", command=lambda: open_projectfile())
+file.add_command(label="Select audio path", command=lambda: set_audiopath())
+file.add_command(label="Save", command=lambda: save_projectfile())
 file.add_command(label="Quit")
 
+pref = Menu(menubar)
+
+mpref_firstonionskin = BooleanVar()
+mpref_beforeonionskin = BooleanVar()
+mpref_afteronionskin = BooleanVar()
+
+pref.add_checkbutton(label="First frame onion", command=preference_refresh, variable=mpref_firstonionskin)
+pref.add_checkbutton(label="Previous frame onion", command=preference_refresh, variable=mpref_beforeonionskin)
+pref.add_checkbutton(label="Next frame onion", command=preference_refresh, variable=mpref_afteronionskin)
+
 menubar.add_cascade(label="File", menu=file)
+menubar.add_cascade(label="Preferences", menu=pref)
+
 
 # -------------------------------------------------------------------------------------#
 # Events activated by buttons that cannot be placed below
 
-def newBoard():
+def new_board():
     project.boards.insert(currentboard + 1, Board([[]], 1000))
-    bbarUpdate()
+    bbar_update()
 
 
-def delBoard():
+def delete_board():
     global currentboard
     del project.boards[currentboard]
     if currentboard > len(project.boards) - 1:
         currentboard = len(project.boards) - 1
-    bbarUpdate()
+    bbar_update()
 
 
-def stopBack():
+def stop_playback():
     global animisplaying
     animisplaying = False
 
 
-def playBack():
+def play_playback():
     global animisplaying
     animisplaying = True
     root.after(project.boards[currentboard].length, playLoop)
@@ -169,6 +210,11 @@ def sizepickerupdate(a):
     erasersize = int(a)
 
 
+def radio_penchoice():
+    global toolchoice
+    toolchoice = str(penchoice.get())
+
+
 # Canvas code
 cframe = Frame(root, bg="black")
 canvas = Canvas(cframe, borderwidth=0, relief="solid", bg=bgcolor, highlightthickness=1)
@@ -180,10 +226,10 @@ background = canvas.create_rectangle(0, 0, project.resolution[0], project.resolu
 leftbar = Frame(root, bg=bgcolor)
 penchoice = StringVar()
 toolframe = Frame(leftbar, bg=bgcolor)
-penpicker = Radiobutton(toolframe, text="Pen", fg=fgcolor, bg=bgcolor, var=penchoice, value="p", selectcolor=bgcolor,
-                        image=imgpen, indicatoron=0, borderwidth=5)
-eraserpicker = Radiobutton(toolframe, text="Era", fg=fgcolor, bg=bgcolor, var=penchoice, value="e", selectcolor=bgcolor,
-                           image=imgera, indicatoron=0, borderwidth=5)
+penpicker = Radiobutton(toolframe, text="Pen", fg=fgcolor, bg=bgcolor, variable=penchoice, value="p", selectcolor=bgcolor,
+                        image=imgpen, indicatoron=False, borderwidth=5, command=radio_penchoice)
+eraserpicker = Radiobutton(toolframe, text="Era", fg=fgcolor, bg=bgcolor, variable=penchoice, value="e", selectcolor=bgcolor,
+                           image=imgera, indicatoron=False, borderwidth=5, command=radio_penchoice)
 erasersizepicker = Scale(toolframe, from_=1, to=50, bg=bgcolor, command=sizepickerupdate, highlightthickness=0,
                          fg=fgcolor)
 
@@ -191,10 +237,10 @@ erasersizepicker = Scale(toolframe, from_=1, to=50, bg=bgcolor, command=sizepick
 bottombar = Frame(root, bg=bgcolor)
 bottombuttons = Frame(bottombar, bg=bgcolor)
 
-BTNaddBoard = Button(bottombuttons, image=imgadd, highlightthickness=0, borderwidth=0, bg=bgcolor, command=newBoard)
-BTNdelBoard = Button(bottombuttons, image=imgdel, highlightthickness=0, borderwidth=0, bg=bgcolor, command=delBoard)
-BTNplayAnim = Button(bottombuttons, image=imgply, highlightthickness=0, borderwidth=0, bg=bgcolor, command=playBack)
-BTNstopAnim = Button(bottombuttons, image=imgstp, highlightthickness=0, borderwidth=0, bg=bgcolor, command=stopBack)
+BTNaddBoard = Button(bottombuttons, image=imgadd, highlightthickness=0, borderwidth=0, bg=bgcolor, command=new_board)
+BTNdelBoard = Button(bottombuttons, image=imgdel, highlightthickness=0, borderwidth=0, bg=bgcolor, command=delete_board)
+BTNplayAnim = Button(bottombuttons, image=imgply, highlightthickness=0, borderwidth=0, bg=bgcolor, command=play_playback)
+BTNstopAnim = Button(bottombuttons, image=imgstp, highlightthickness=0, borderwidth=0, bg=bgcolor, command=stop_playback)
 
 bottomc = Canvas(bottombar, bg=bgcolor, highlightthickness=0, height=100, confine=False,
                  scrollregion=canvas.bbox("all"))
@@ -221,12 +267,50 @@ bottomc.grid(sticky="EW", column=1, row=0)
 
 # Define canvas drawing events
 
+
+# Update canvas or memory
+def screenupdate(a):
+    canvupdate(0)
+    bbar_update()
+
+
+def canvupdate(*_):
+    global currentboard
+    if currentboard > len(project.boards) - 1:
+        currentboard = len(project.boards) - 1
+    canvas.delete("all")
+    global background
+    background = canvas.create_rectangle(0, 0, project.resolution[0] * zoom, project.resolution[1] * zoom, outline="",
+                                         fill="white")
+
+    if pref_firstonionskin: draw_frame(0, "#EEE")
+    if pref_beforeonionskin & (currentboard > 0): draw_frame(currentboard - 1, "#EEE")
+    if pref_afteronionskin & ((len(project.boards) - 1) > currentboard): draw_frame(currentboard + 1, "#EEE")
+    draw_frame(currentboard, "black")
+
+    global pencircle
+    pencircle = canvas.create_oval((erasersize * -2) * zoom, (erasersize * -2) * zoom, 0, 0, outline="red")
+
+
+def draw_frame(fra, clr):
+    if zoom == 1:
+        for j in range(len(project.boards[fra].get) - 1):
+            canvas.create_line(project.boards[fra].get[j], width=linewidth * zoom, fill=clr)
+    else:
+        cbo = project.boards[fra].get
+        for j in range(len(cbo)):
+            for i in range(len(cbo[j]) - 1):
+                canvas.create_line((cbo[j][i][0] * zoom), (cbo[j][i][1] * zoom), (cbo[j][i + 1][0] * zoom),
+                                   (cbo[j][i + 1][1] * zoom), width=linewidth * zoom, fill=clr)
+
+
+# Small events that are bound to keys
 def drawtouch(e):
     drawmove(e)
 
 
 def drawlift(e):
-    if penchoice.get() == "p":
+    if toolchoice == "p":
         drawmove(e)
         global canvascurrentlist
         global currentboard
@@ -235,13 +319,13 @@ def drawlift(e):
         canvascurrentlist = canvascurrentlist + 1
         global drawdown
         drawdown = False
-    elif penchoice.get() == "e":
+    elif toolchoice == "e":
         canvupdate(0)
 
 
 def drawmove(e):
     global canvascurrentlist
-    if (penchoice.get() == "p") & (e.x < project.resolution[0] * zoom) & (e.y < project.resolution[1] * zoom):
+    if (toolchoice == "p") & (e.x < project.resolution[0] * zoom) & (e.y < project.resolution[1] * zoom):
         canvascurrentlist = len(project.boards[currentboard].get) - 1
         project.boards[currentboard].get[canvascurrentlist].append((e.x / zoom, e.y / zoom))
         global drawx
@@ -252,10 +336,10 @@ def drawmove(e):
             drawx = e.x
             drawy = e.y
         elif math.dist((drawx, drawy), (e.x, e.y)) > 2:
-            canvas.create_line((drawx, drawy), (e.x, e.y), width=4 * zoom, fill='black', smooth=True)
+            canvas.create_line((drawx, drawy), (e.x, e.y), width=linewidth * zoom, fill='black', smooth=True)
             drawx = e.x
             drawy = e.y
-    elif penchoice.get() == "e":
+    elif toolchoice == "e":
         canvas.moveto(pencircle, e.x - (erasersize * zoom), e.y - (erasersize * zoom))
         l = 0
         qdistdebug = 5000
@@ -277,68 +361,30 @@ def resetzoom(a):
     canvupdate(1)
 
 
-def screenupdate(a):
-    canvupdate(0)
-    bbarUpdate()
-
-
-def canvupdate(a):
-    global currentboard
-    if currentboard > len(project.boards) - 1:
-        currentboard = len(project.boards) - 1
-    canvas.delete("all")
-    global background
-    background = canvas.create_rectangle(0, 0, project.resolution[0] * zoom, project.resolution[1] * zoom, outline="",
-                                         fill="white")
-
-    if zoom == 1:
-        for j in range(len(project.boards[0].get) - 1):
-            canvas.create_line(project.boards[0].get[j], width=4 * zoom, fill="#EEE")
-    else:
-        cbo = project.boards[0].get
-        for j in range(len(cbo)):
-            for i in range(len(cbo[j]) - 1):
-                canvas.create_line((cbo[j][i][0] * zoom), (cbo[j][i][1] * zoom), (cbo[j][i + 1][0] * zoom),
-                                   (cbo[j][i + 1][1] * zoom), width=4 * zoom, fill="#EEE")
-
-    if zoom == 1:
-        for j in range(len(project.boards[currentboard].get) - 1):
-            canvas.create_line(project.boards[currentboard].get[j], width=4 * zoom, fill="black")
-    else:
-        cbo = project.boards[currentboard].get
-        for j in range(len(cbo)):
-            for i in range(len(cbo[j]) - 1):
-                canvas.create_line((cbo[j][i][0] * zoom), (cbo[j][i][1] * zoom), (cbo[j][i + 1][0] * zoom),
-                                   (cbo[j][i + 1][1] * zoom), width=4 * zoom, fill="black")
-
-    global pencircle
-    pencircle = canvas.create_oval((erasersize * -2) * zoom, (erasersize * -2) * zoom, 0, 0, outline="red")
-
-
-def zoomWinOSX(e):
+def zoom_winosx(e):
     if e.delta > 0:
-        zoomIn()
+        zoom_in()
     else:
-        zoomOut()
+        zoom_out()
     global zoom
     if abs(zoom - 1) < 0.05:
         zoom = 1
 
 
-def zoomIn():
+def zoom_in():
     global zoom
     zoom = zoom * 1.1
     canvupdate(0)
 
 
-def zoomOut():
+def zoom_out():
     global zoom
     zoom = zoom / 1.1
     canvupdate(0)
 
 
-# Define bottombar drawing events
-def bbarUpdate():
+# Bottom bar-specific events
+def bbar_update():
     bottomc.delete("all")
     thumbsizedivide = 6
     currentx = 10
@@ -353,21 +399,65 @@ def bbarUpdate():
             bottomc.create_rectangle(currentx, thumbpad, currentx + thumbx, thumby + thumbpad, outline="", fill="white")
         currentx = currentx + thumbx + thumbpad
 
+    # Renders audio, unused because of broken input from the bbarWaveLoad function
+    # bottomc.create_line(importaudiovec, width=1, fill="white", smooth=True)
 
-def bbarGrab(e):
+
+def bbar_wave_load():
+    """
+    if (project.audiopath != "NA"):
+        global importaudiofreq
+        global importaudiovec
+        wavefile = None
+        wavebytes = None
+        try:
+            wavefile = wave.open(project.audiopath, mode="rb")
+        except Exception as exccode:
+            print("Failed to load audio with " + exccode)
+        if wavefile == None:
+            return
+        wavebytes = wavefile.readframes(9223372036854775808)
+        # importaudiovec for storing audio
+        importaudiofreq = wavefile.getframerate()
+        importaudiovec = []
+
+        qresolution = 5000
+        offset = (10, 40) # below this line is magic number hell, don't ask me what these do
+        audiox = (1000 / importaudiofreq) / (12 * wavefile.getnchannels())
+
+        for i in range(round(len(wavebytes) / qresolution)):
+            iavxpos = (i * qresolution) * audiox
+            iavypos = float(wavebytes[int(i * qresolution)]) * 0.1
+            importaudiovec.append((iavxpos + offset[0], iavypos + offset[1]))
+        print(len(importaudiovec))
+        print("j")
+        print(importaudiovec[len(importaudiovec) - 1])
+        root.title('Franimate 24.07.13 - ' + project.audiopath)
+    """
+
+    global importaudiovec
+    # importaudiovec = file.open(project.audiopath) TODO: Load audio files
+
+
+#        for i in range(int(len(wavebytes) / qresolution)):
+#            offset = (10, 40)
+#
+#            importaudiovec.append((((i * audiox) + offset[0]), wavebytes[int(i / qresolution)] * 0.1 + offset[1]))
+
+def bbar_grab(e):
     global bbarGrabbed
     if bbarGrabbed:
         global bbarStartLength
         project.boards[bbarGrabID].length = int(abs((bottomc.canvasx(e.x) - bbarStartLength) * 6))
-        bbarUpdate()
+        bbar_update()
 
 
-def bbarRls(e):
+def bbar_release(*_):
     global bbarGrabbed
     bbarGrabbed = False
 
 
-def bbarCanvChek(e):
+def bbar_canvas_check(e):
     currentx = 10
     thumbsizedivide = 6
     thumbpad = 10
@@ -380,7 +470,8 @@ def bbarCanvChek(e):
             global currentboard
             currentboard = i
             screenupdate(0)
-        elif (relativecanvasmousex > currentx + thumbx) & (relativecanvasmousex < currentx + thumbx + thumbpad) & (e.y < thumby + thumbpad):
+        elif (relativecanvasmousex > currentx + thumbx) & (relativecanvasmousex < currentx + thumbx + thumbpad) & (
+                e.y < thumby + thumbpad):
             print("Grab!")
             global bbarGrabbed
             global bbarGrabID
@@ -389,21 +480,35 @@ def bbarCanvChek(e):
             bbarGrabbed = True
             bbarStartLength = currentx
         currentx = currentx + thumbx + thumbpad
-    if(e.x > (bottomc.winfo_width() - 20)):
+    if e.x > (bottomc.winfo_width() - 20):
         bottomc.xview_scroll(1, UNITS)
-    if(e.x < 20):
+    if e.x < 20:
         bottomc.xview_scroll(-1, UNITS)
 
 
+# Define bottombar drawing events
 
-canvas.bind('<MouseWheel>', zoomWinOSX)
+
+# Commonly customized keybinds like undo/redo/play/swapframe
+
+def set_penchoice(f):
+    global toolchoice
+    toolchoice = f
+
+
+root.bind('1', lambda event: set_penchoice("p"))
+root.bind('2', lambda event: set_penchoice("e"))
+
+# Standard required keybinds like click and zoom
+
+canvas.bind('<MouseWheel>', zoom_winosx)
 canvas.bind('<B1-Motion>', drawmove)
-bottomc.bind('<B1-Motion>', bbarGrab)
-bottomc.bind('<ButtonRelease-1>', bbarRls)
-bottomc.bind('<Button>', bbarCanvChek)
+bottomc.bind('<B1-Motion>', bbar_grab)
+bottomc.bind('<ButtonRelease-1>', bbar_release)
+bottomc.bind('<Button>', bbar_canvas_check)
 erasersizepicker.bind('<ButtonRelease-1>', screenupdate)
 canvas.bind('<ButtonPress-1>', drawmove)
-# bottomc.bind('<ButtonPress-1>', bbarCanvChek())
+# bottomc.bind('<ButtonPress-1>', bbar_canvas_check())
 canvas.bind('<ButtonRelease-1>', drawlift)
 root.bind('r', screenupdate)
 root.bind('t', resetzoom)
