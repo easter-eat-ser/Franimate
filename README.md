@@ -1,7 +1,7 @@
 # Franimate
 Software for creating small, low-framerate animations with a static background
 ## Setup
-Simply run the program with an IDE or the latest Python 3, no requirements other than Tkinter and `json` (which should be preinstalled with Python).
+Simply run the program with an IDE or the latest Python 3, no requirements other than Tkinter, `json`, and `math` (which should be preinstalled with Python).
 If the library Tkinter is missing, try these commands:
 ### Ubuntu/Debian
 `sudo apt-get install python3-tk `
