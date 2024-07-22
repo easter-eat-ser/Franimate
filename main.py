@@ -109,12 +109,7 @@ def open_projectfile():
         for i in range(len(pfd[2])):
             boardlist.append(Board(dict(pfd[2][i]).get("get"), dict(pfd[2][i]).get("length")))
         print(boardlist)
-        projectBuffer = Project(pfd[0], pfd[1], boardlist, pfd[3], pfd[4])
-        for qin, i in enumerate(projectBuffer.boards):
-            for qjn, j in enumerate(i.get):
-                if checkInvalid(j):
-                    projectBuffer.boards[qin].get.pop(qjn)
-        project = projectBuffer
+        project = Project(pfd[0], pfd[1], boardlist, pfd[3], pfd[4])
     except Exception as excodename:
         messagebox.showerror(title="File error", message=str(excodename))
     else:
@@ -321,52 +316,20 @@ def canvupdate(*_):
     global pencircle
     pencircle = canvas.create_oval((erasersize * -2) * zoom, (erasersize * -2) * zoom, 0, 0, outline="red")
 
-def checkInvalid(string):
-    if(string == []):
-        return True
-    elif(string == [[0, 0], [0, 0]]):
-        return True
-    elif(len(string) < 2):
-        return True
-    else:
-        return False
-
 def draw_frame(fra, clr):
-    global project
-    preerror = 0
-    try:
-        if zoom == 1:
-            for j in range(len(project.boards[fra].get) - 1):
-                preerror = j
-                print("Begin")
-                print(project.boards[fra].get)
-                print(j)
-                print(project.boards[fra].get[j])
-                try:
-                    canvas.create_line(project.boards[fra].get[j], width=linewidth * zoom, fill=clr)
-                except:
-                    print("ERRRRRRRRRRRRRRRRRRRRRRROR!")
-        else:
-            cbo = project.boards[fra].get
-            for j in range(len(cbo)):
-                for i in range(len(cbo[j]) - 1):
-                    canvas.create_line((cbo[j][i][0] * zoom), (cbo[j][i][1] * zoom), (cbo[j][i + 1][0] * zoom),
-                    (cbo[j][i + 1][1] * zoom), width=linewidth * zoom, fill=clr)
-    except IndexError as indexexc:
-        indexerroranswer = messagebox.showerror(title="Index error", message="An invalid point has been detected in your drawing.\nAutomatically fix?\nDEBUG INFO: " + str(indexexc),  type="okcancel")
-        if (indexerroranswer == "ok"):
-            print("Error, fixing")
-            for j, j2 in enumerate(project.boards[fra].get):
-                if (checkInvalid(j2)):
-                    print("Removed instanceds:")
-                    print(j2)
-                    project.boards[fra].get.pop(j)
-                    #del project.boards[fra].get[j]
-            global canvascurrentlist
-            canvascurrentlist = len(project.boards[currentboard].get) - 1
-            print(project.boards[fra])
-    #except TclError as indexexc:
-    #    messagebox.showerror(title="Tkinter error", message="Not sure\nDEBUG INFO: " + str(indexexc),  type="ok")
+    if zoom == 1:
+        for j in range(len(project.boards[fra].get) - 1):
+            # Sanity check because sometimes the 'tuple index' goes out of range
+            if len(project.boards[fra].get[j]) < 4:
+                warnings.warn("Tuple index at " + str(project.boards[fra].get[j]))
+                return
+            canvas.create_line(project.boards[fra].get[j], width=linewidth * zoom, fill=clr)
+    else:
+        cbo = project.boards[fra].get
+        for j in range(len(cbo)):
+            for i in range(len(cbo[j]) - 1):
+                canvas.create_line((cbo[j][i][0] * zoom), (cbo[j][i][1] * zoom), (cbo[j][i + 1][0] * zoom),
+                                   (cbo[j][i + 1][1] * zoom), width=linewidth * zoom, fill=clr)
 
 
 # Small events that are bound to keys
