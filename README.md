@@ -9,3 +9,5 @@ If the library Tkinter is missing, try these commands:
 Reinstall Python3 from the executable installer, but make sure to check the box that installs Tk
 ### MacOS
 `brew install python-tk`
+## Other fixes
+For lag when using drawing tablets, switch off Windows Ink in your tablet's settings
