@@ -1,4 +1,5 @@
 import json
+import warnings
 # import wave
 from tkinter import *
 from tkinter import filedialog
@@ -295,6 +296,10 @@ def canvupdate(*_):
 def draw_frame(fra, clr):
     if zoom == 1:
         for j in range(len(project.boards[fra].get) - 1):
+            # Sanity check because sometimes the 'tuple index' goes out of range
+            if len(project.boards[fra].get[j]) < 4:
+                warnings.warn("Tuple index at " + str(project.boards[fra].get[j]))
+                return
             canvas.create_line(project.boards[fra].get[j], width=linewidth * zoom, fill=clr)
     else:
         cbo = project.boards[fra].get
