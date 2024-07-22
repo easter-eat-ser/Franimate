@@ -25,11 +25,11 @@ pref_afteronionskin = False
 
 erasersize = 10
 canvascontent = [[]]
-canvascurrentlist = 0
+canvascurrentlist = 1
 windowwidth = 1920
 windowheight = 1080
-fgcolor = "#EEE"
-bgcolor = "#111"
+fgcolor = "#FFF"
+bgcolor = "#2F372E"
 linewidth = 7
 drawx = 0
 drawy = 0
@@ -81,22 +81,25 @@ def center_window():
 root = Tk()
 root.geometry("1920x1080")
 root.title('Franimate 24.07.13 - ' + project.audiopath)
+root.state("zoomed")
 #center_window()
 
 # import images
 # external image import
-imgpen = PhotoImage(file="./icons/pen.png").subsample(4, 4)
-imgera = PhotoImage(file="./icons/eraser.png").subsample(4, 4)
-imgadd = PhotoImage(file="./icons/add.png").subsample(4, 4)
-imgdel = PhotoImage(file="./icons/delete.png").subsample(4, 4)
-imgply = PhotoImage(file="./icons/play.png").subsample(4, 4)
-imgstp = PhotoImage(file="./icons/stop.png").subsample(4, 4)
+imgpen0 = PhotoImage(file="./icons/penb.png").subsample(1, 1)
+imgpen1 = PhotoImage(file="./icons/pena.png").subsample(1, 1)
+imgera0 = PhotoImage(file="./icons/erab.png").subsample(1, 1)
+imgera1 = PhotoImage(file="./icons/eraa.png").subsample(1, 1)
+imgadd = PhotoImage(file="./icons/add.png").subsample(1, 1)
+imgdel = PhotoImage(file="./icons/delete.png").subsample(1, 1)
+imgply = PhotoImage(file="./icons/play.png").subsample(1, 1)
+imgstp = PhotoImage(file="./icons/stop.png").subsample(1, 1)
 imglit = PhotoImage(file="./icons/light.png")
 
 
 # Menu functions
 def open_projectfile():
-    pjfilep = filedialog.askopenfilename(filetypes=[('JSON project file', '*.json')])
+    pjfilep = filedialog.askopenfilename(filetypes=[('JSON project file', '*.json'), ('All files', '*')])
     pjfile = open(pjfilep, 'r')
     try:
         global project
@@ -140,9 +143,14 @@ def preference_refresh():
     global pref_afteronionskin
     global pref_firstonionskin
     global pref_beforeonionskin
+    global mpref_fullscreen
     pref_firstonionskin = mpref_firstonionskin.get()
     pref_beforeonionskin = mpref_beforeonionskin.get()
     pref_afteronionskin = mpref_afteronionskin.get()
+    if mpref_fullscreen.get():
+        root.attributes("-fullscreen", True)
+    else:
+        root.attributes("-fullscreen", False)
     canvupdate()
 
 # Set up menus
@@ -151,17 +159,20 @@ file = Menu(menubar, tearoff=False)
 file.add_command(label="Open file", command=lambda: open_projectfile())
 file.add_command(label="Select audio path", command=lambda: set_audiopath())
 file.add_command(label="Save", command=lambda: save_projectfile())
-file.add_command(label="Quit")
+file.add_command(label="Quit", command=lambda: root.destroy())
 
 pref = Menu(menubar)
 
 mpref_firstonionskin = BooleanVar()
 mpref_beforeonionskin = BooleanVar()
 mpref_afteronionskin = BooleanVar()
+mpref_fullscreen = BooleanVar()
 
 pref.add_checkbutton(label="First frame onion", command=preference_refresh, variable=mpref_firstonionskin)
 pref.add_checkbutton(label="Previous frame onion", command=preference_refresh, variable=mpref_beforeonionskin)
 pref.add_checkbutton(label="Next frame onion", command=preference_refresh, variable=mpref_afteronionskin)
+pref.add_separator()
+pref.add_checkbutton(label="Fullscreen", command=preference_refresh, variable=mpref_fullscreen)
 
 menubar.add_cascade(label="File", menu=file)
 menubar.add_cascade(label="Preferences", menu=pref)
@@ -214,11 +225,22 @@ def sizepickerupdate(a):
 def radio_penchoice():
     global toolchoice
     toolchoice = str(penchoice.get())
+    radio_update()
+
+def radio_update():
+    if toolchoice == "p":
+        penpicker.configure(image=imgpen1)
+    else:
+        penpicker.configure(image=imgpen0)
+    if toolchoice == "e":
+        eraserpicker.configure(image=imgera1)
+    else:
+        eraserpicker.configure(image=imgera0)
 
 
 # Canvas code
 cframe = Frame(root, bg="black")
-canvas = Canvas(cframe, borderwidth=0, relief="solid", bg=bgcolor, highlightthickness=1)
+canvas = Canvas(cframe, borderwidth=0, relief="solid", bg="#19201D", highlightthickness=0)
 
 pencircle = canvas.create_oval(-20, -20, 0, 0, outline="black")
 background = canvas.create_rectangle(0, 0, project.resolution[0], project.resolution[1], outline="", fill="white")
@@ -228,9 +250,9 @@ leftbar = Frame(root, bg=bgcolor)
 penchoice = StringVar()
 toolframe = Frame(leftbar, bg=bgcolor)
 penpicker = Radiobutton(toolframe, text="Pen", fg=fgcolor, bg=bgcolor, variable=penchoice, value="p", selectcolor=bgcolor,
-                        image=imgpen, indicatoron=False, borderwidth=5, command=radio_penchoice)
+                        image=imgpen1, indicatoron=False, borderwidth=0, command=radio_penchoice)
 eraserpicker = Radiobutton(toolframe, text="Era", fg=fgcolor, bg=bgcolor, variable=penchoice, value="e", selectcolor=bgcolor,
-                           image=imgera, indicatoron=False, borderwidth=5, command=radio_penchoice)
+                           image=imgera0, indicatoron=False, borderwidth=0, command=radio_penchoice)
 erasersizepicker = Scale(toolframe, from_=1, to=50, bg=bgcolor, command=sizepickerupdate, highlightthickness=0,
                          fg=fgcolor)
 
@@ -242,28 +264,30 @@ BTNaddBoard = Button(bottombuttons, image=imgadd, highlightthickness=0, borderwi
 BTNdelBoard = Button(bottombuttons, image=imgdel, highlightthickness=0, borderwidth=0, bg=bgcolor, command=delete_board)
 BTNplayAnim = Button(bottombuttons, image=imgply, highlightthickness=0, borderwidth=0, bg=bgcolor, command=play_playback)
 BTNstopAnim = Button(bottombuttons, image=imgstp, highlightthickness=0, borderwidth=0, bg=bgcolor, command=stop_playback)
+LABELboardinfo = Label(bottombuttons, fg=fgcolor, bg=bgcolor, text="", font=("Eccentric Std", 15))
 
-bottomc = Canvas(bottombar, bg=bgcolor, highlightthickness=0, height=100, confine=False,
+bottomc = Canvas(bottombar, bg=bgcolor, highlightthickness=0, height=40, confine=False,
                  scrollregion=canvas.bbox("all"))
 
 # Final assembly of widgets
 leftbar.grid(column=0, row=0, sticky=NSEW)
-toolframe.grid(column=0, row=0, sticky=N, padx=6, pady=6)
+toolframe.grid(column=0, row=0, sticky=N, padx=0, pady=6)
 penpicker.pack(side="top")
 eraserpicker.pack(side="top")
-erasersizepicker.pack(side="bottom")
+erasersizepicker.pack(side="left")
 
 cframe.grid(column=1, row=0, sticky=NSEW)
 canvas.pack(expand=TRUE, fill=BOTH)
 
 bottombar.grid(column=0, row=1, columnspan=2, sticky="NSEW", ipadx=0, ipady=0)
 
-bottombuttons.grid(sticky="", column=0, row=0, ipadx=10, ipady=2)
-BTNaddBoard.pack()
-BTNdelBoard.pack()
-BTNplayAnim.pack()
-BTNstopAnim.pack()
-bottomc.grid(sticky="EW", column=1, row=0)
+bottombuttons.grid(sticky="EW", column=0, row=1, padx=2, ipadx=10, ipady=2)
+BTNaddBoard.pack(side="left")
+BTNdelBoard.pack(side="left")
+BTNplayAnim.pack(side="left")
+BTNstopAnim.pack(side="left")
+LABELboardinfo.pack(side="right", padx=10)
+bottomc.grid(sticky="EW", column=0, row=0)
 
 
 # Define canvas drawing events
@@ -287,11 +311,11 @@ def canvupdate(*_):
     if pref_firstonionskin: draw_frame(0, "#EEE")
     if pref_beforeonionskin & (currentboard > 0): draw_frame(currentboard - 1, "#EEE")
     if pref_afteronionskin & ((len(project.boards) - 1) > currentboard): draw_frame(currentboard + 1, "#EEE")
+    print(currentboard)
     draw_frame(currentboard, "black")
 
     global pencircle
     pencircle = canvas.create_oval((erasersize * -2) * zoom, (erasersize * -2) * zoom, 0, 0, outline="red")
-
 
 def draw_frame(fra, clr):
     if zoom == 1:
@@ -393,6 +417,8 @@ def bbar_update():
     bottomc.delete("all")
     thumbsizedivide = 6
     currentx = 10
+    startingposition = 0
+    endingposition = 0
     for i in range(0, len(project.boards)):
         thumbpad = 10
         thumbx = project.boards[i].length / thumbsizedivide
@@ -403,6 +429,13 @@ def bbar_update():
         else:
             bottomc.create_rectangle(currentx, thumbpad, currentx + thumbx, thumby + thumbpad, outline="", fill="white")
         currentx = currentx + thumbx + thumbpad
+        if(i <= currentboard):
+            startingposition = endingposition
+            endingposition = endingposition + project.boards[i].length
+
+    label_update_text = ("Length: " + str(project.boards[currentboard].length) + ", Start Position: " + str(startingposition) + ", End Position: " + str(endingposition) + ", Current Frame: " + str(currentboard))
+
+    LABELboardinfo.config(text=label_update_text)
 
     # Renders audio, unused because of broken input from the bbarWaveLoad function
     # bottomc.create_line(importaudiovec, width=1, fill="white", smooth=True)
@@ -499,6 +532,7 @@ def bbar_canvas_check(e):
 def set_penchoice(f):
     global toolchoice
     toolchoice = f
+    radio_update()
 
 
 root.bind('1', lambda event: set_penchoice("p"))
@@ -518,7 +552,8 @@ canvas.bind('<ButtonRelease-1>', drawlift)
 root.bind('r', screenupdate)
 root.bind('t', resetzoom)
 
-bottombar.grid_columnconfigure(1, weight=1)
+bottombar.grid_columnconfigure(0, weight=1)
+bottombar.grid_rowconfigure(0, weight=1)
 root.grid_rowconfigure(0, weight=1)
 root.grid_columnconfigure(1, weight=1)
 root.config(menu=menubar, bg="#111")
